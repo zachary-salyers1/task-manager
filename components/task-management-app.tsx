@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -9,24 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-
-type Client = {
-  id: string
-  name: string
-}
-
-type Project = {
-  id: string
-  clientId: string
-  name: string
-}
-
-type Task = {
-  id: string
-  projectId: string
-  name: string
-  completionDate: Date
-}
+import { Client, Project, Task } from "../types"
+import { addClient, updateClient, getClients, addProject, updateProject, getProjects, addTask, updateTask, getTasks } from "../lib/firebaseUtils"
 
 export function TaskManagementAppComponent() {
   const [clients, setClients] = useState<Client[]>([])
@@ -34,30 +18,53 @@ export function TaskManagementAppComponent() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date())
 
-  const addClient = (name: string) => {
-    const newClient: Client = { id: Date.now().toString(), name }
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const fetchedClients = await getClients()
+        const fetchedProjects = await getProjects()
+        const fetchedTasks = await getTasks()
+        setClients(fetchedClients)
+        setProjects(fetchedProjects)
+        setTasks(fetchedTasks)
+      } catch (error) {
+        console.error("Error fetching data:", error)
+        // Here you might want to set an error state and display it to the user
+      }
+    }
+    fetchData()
+  }, [])
+
+  const addClientHandler = async (name: string) => {
+    const newClientId = await addClient({ name })
+    const newClient: Client = { id: newClientId, name }
     setClients([...clients, newClient])
   }
 
-  const editClient = (id: string, name: string) => {
+  const editClientHandler = async (id: string, name: string) => {
+    await updateClient(id, { name })
     setClients(clients.map(client => client.id === id ? { ...client, name } : client))
   }
 
-  const addProject = (clientId: string, name: string) => {
-    const newProject: Project = { id: Date.now().toString(), clientId, name }
+  const addProjectHandler = async (clientId: string, name: string) => {
+    const newProjectId = await addProject({ clientId, name })
+    const newProject: Project = { id: newProjectId, clientId, name }
     setProjects([...projects, newProject])
   }
 
-  const editProject = (id: string, name: string) => {
+  const editProjectHandler = async (id: string, name: string) => {
+    await updateProject(id, { name })
     setProjects(projects.map(project => project.id === id ? { ...project, name } : project))
   }
 
-  const addTask = (projectId: string, name: string, completionDate: Date) => {
-    const newTask: Task = { id: Date.now().toString(), projectId, name, completionDate }
+  const addTaskHandler = async (projectId: string, name: string, completionDate: Date) => {
+    const newTaskId = await addTask({ projectId, name, completionDate })
+    const newTask: Task = { id: newTaskId, projectId, name, completionDate }
     setTasks([...tasks, newTask])
   }
 
-  const editTask = (id: string, name: string, completionDate: Date) => {
+  const editTaskHandler = async (id: string, name: string, completionDate: Date) => {
+    await updateTask(id, { name, completionDate })
     setTasks(tasks.map(task => task.id === id ? { ...task, name, completionDate } : task))
   }
 
@@ -81,16 +88,16 @@ export function TaskManagementAppComponent() {
           <TabsTrigger value="calendar">Calendar</TabsTrigger>
         </TabsList>
         <TabsContent value="clients">
-          <ClientForm onAddClient={addClient} />
-          <ClientList clients={clients} onEditClient={editClient} />
+          <ClientForm onAddClient={addClientHandler} />
+          <ClientList clients={clients} onEditClient={editClientHandler} />
         </TabsContent>
         <TabsContent value="projects">
-          <ProjectForm clients={clients} onAddProject={addProject} />
-          <ProjectList projects={projects} clients={clients} onEditProject={editProject} />
+          <ProjectForm clients={clients} onAddProject={addProjectHandler} />
+          <ProjectList projects={projects} clients={clients} onEditProject={editProjectHandler} />
         </TabsContent>
         <TabsContent value="tasks">
-          <TaskForm projects={projects} onAddTask={addTask} />
-          <TaskList tasks={tasks} projects={projects} onEditTask={editTask} />
+          <TaskForm projects={projects} onAddTask={addTaskHandler} />
+          <TaskList tasks={tasks} projects={projects} onEditTask={editTaskHandler} />
         </TabsContent>
         <TabsContent value="calendar">
           <div className="flex">
@@ -104,7 +111,7 @@ export function TaskManagementAppComponent() {
             </div>
             <div className="w-1/2 pl-4">
               <h2 className="text-lg font-semibold mb-2">Tasks for {selectedDate?.toDateString()}</h2>
-              <TaskList tasks={getTasksForDate(selectedDate || new Date())} projects={projects} onEditTask={editTask} />
+              <TaskList tasks={getTasksForDate(selectedDate || new Date())} projects={projects} onEditTask={editTaskHandler} />
             </div>
           </div>
         </TabsContent>
